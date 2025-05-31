@@ -1,0 +1,24 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug vdb_server",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/wal_test",  // 可执行文件路径
+      "args": [],  // 可填入程序参数
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "externalConsole": false,  // 设置 true 将使用外部终端
+      "MIMode": "gdb",           // Linux 使用 gdb，macOS 使用 lldb
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ]
+    }
+  ]
+}
