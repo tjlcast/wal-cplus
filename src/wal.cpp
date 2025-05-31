@@ -933,19 +933,24 @@ void WAL::TruncateBackInternal(uint64_t index)
     }
 }
 
-void WAL::PushCache(int seg_idx)
-{
-    if (seg_idx < 0 || seg_idx >= static_cast<int>(segments_.size()))
-    {
+void WAL::PushCache(int seg_idx) {
+    if (seg_idx < 0 || seg_idx >= static_cast<int>(segments_.size())) {
         return;
     }
 
     // Simple LRU cache implementation
-    if (scache_.size() >= options_.segment_cache_size)
-    {
+    if (scache_.size() >= options_.segment_cache_size) {
         // Find least recently used
         int lru_idx = lru_order_.front();
-        scache_.erase(lru_idx);
+        auto it = scache_.find(lru_idx);
+        if (it != scache_.end()) {
+            // Clear the evicted segment's data
+            it->second->ebuf.clear();
+            it->second->ebuf.shrink_to_fit();
+            it->second->epos.clear();
+            it->second->epos.shrink_to_fit();
+            scache_.erase(it);
+        }
         lru_order_.erase(lru_order_.begin());
     }
 
