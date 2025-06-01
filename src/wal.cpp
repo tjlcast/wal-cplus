@@ -933,17 +933,21 @@ void WAL::TruncateBackInternal(uint64_t index)
     }
 }
 
-void WAL::PushCache(int seg_idx) {
-    if (seg_idx < 0 || seg_idx >= static_cast<int>(segments_.size())) {
+void WAL::PushCache(int seg_idx)
+{
+    if (seg_idx < 0 || seg_idx >= static_cast<int>(segments_.size()))
+    {
         return;
     }
 
     // Simple LRU cache implementation
-    if (scache_.size() >= options_.segment_cache_size) {
+    if (scache_.size() >= options_.segment_cache_size)
+    {
         // Find least recently used
         int lru_idx = lru_order_.front();
         auto it = scache_.find(lru_idx);
-        if (it != scache_.end()) {
+        if (it != scache_.end())
+        {
             // Clear the evicted segment's data
             it->second->ebuf.clear();
             it->second->ebuf.shrink_to_fit();
@@ -1138,4 +1142,68 @@ void WAL::Batch::Clear()
 {
     entries.clear();
     datas.clear();
+}
+
+void WAL::printSegmentInfo()
+{
+    // std::lock_guard<std::mutex> lock(mutex_);
+
+    std::cout << "===== WAL Segment Information =====" << std::endl;
+    std::cout << "Path: " << path_ << std::endl;
+    std::cout << "First Index: " << first_index_ << std::endl;
+    std::cout << "Last Index: " << last_index_ << std::endl;
+    std::cout << "Total Segments: " << segments_.size() << std::endl;
+    std::cout << "Segment Cache Size: " << scache_.size() << std::endl;
+    std::cout << "Corrupt: " << (corrupt_ ? "Yes" : "No") << std::endl;
+    std::cout << "Closed: " << (closed_ ? "Yes" : "No") << std::endl;
+    std::cout << "Current Segment File: " << (sfile_ ? segments_.back()->path : "None") << std::endl;
+
+    std::cout << "\n===== Detailed Segment Information =====" << std::endl;
+    for (size_t i = 0; i < segments_.size(); i++)
+    {
+        const auto &seg = segments_[i];
+        std::cout << "\nSegment #" << i << ":" << std::endl;
+        std::cout << "  Path: " << seg->path << std::endl;
+        std::cout << "  Index: " << seg->index << std::endl;
+        std::cout << "  Entry Count: " << seg->epos.size() << std::endl;
+        std::cout << "  Buffer Size: " << seg->ebuf.size() << " bytes" << std::endl;
+
+        // Print first and last entry positions if available
+        if (!seg->epos.empty())
+        {
+            std::cout << "  First Entry Position: [" << seg->epos[0].first
+                      << ", " << seg->epos[0].second << "]" << std::endl;
+            std::cout << "  Last Entry Position: [" << seg->epos.back().first
+                      << ", " << seg->epos.back().second << "]" << std::endl;
+        }
+
+        // Print cache status
+        bool in_cache = false;
+        for (const auto &[idx, cached_seg] : scache_)
+        {
+            if (cached_seg == seg)
+            {
+                in_cache = true;
+                break;
+            }
+        }
+        std::cout << "  In Cache: " << (in_cache ? "Yes" : "No") << std::endl;
+    }
+
+    std::cout << "\n===== Cache Information =====" << std::endl;
+    std::cout << "Cached Segments (LRU order): ";
+    for (int idx : lru_order_)
+    {
+        std::cout << idx << " ";
+    }
+    std::cout << std::endl;
+
+    std::cout << "\n===== Options =====" << std::endl;
+    std::cout << "Segment Size: " << options_.segment_size << " bytes" << std::endl;
+    std::cout << "Segment Cache Size: " << options_.segment_cache_size << std::endl;
+    std::cout << "Log Format: " << (options_.log_format == LogFormat::JSON ? "JSON" : "Binary") << std::endl;
+    std::cout << "No Copy: " << (options_.no_copy ? "Yes" : "No") << std::endl;
+    std::cout << "No Sync: " << (options_.no_sync ? "Yes" : "No") << std::endl;
+    std::cout << "Directory Permissions: " << std::oct << options_.dir_perms << std::dec << std::endl;
+    std::cout << "File Permissions: " << std::oct << options_.file_perms << std::dec << std::endl;
 }

@@ -160,7 +160,6 @@ void TestJSONFormat()
     std::cout << "TestJSONFormat passed\n";
 }
 
-
 void TestStringWithJSONFormat()
 {
     std::cout << "Running WAL string JSON format tests...\n";
@@ -175,7 +174,7 @@ void TestStringWithJSONFormat()
 
         // 准备测试字符串
         std::string test_str1 = "Hello, WAL!";
-        std::string test_str2 = "你好，世界！";  // 包含非ASCII字符
+        std::string test_str2 = "你好，世界！"; // 包含非ASCII字符
 
         // 写入字符串
         wal.Write(1, std::vector<uint8_t>(test_str1.begin(), test_str1.end()));
@@ -201,6 +200,58 @@ void TestStringWithJSONFormat()
     std::cout << "TestStringWithJSONFormat passed\n";
 }
 
+void TestSmallSegmentWithCache()
+{
+    std::cout << "Running WAL small segment with cache tests...\n";
+    std::string path = "test_wal_small_segment";
+    fs::remove_all(path);
+
+    WAL::Options opts;
+    opts.log_format = WAL::LogFormat::JSON;
+    opts.segment_size = 10;      // Very small segment size to force many segments
+    opts.segment_cache_size = 1; // Only keep 1 segment in cache
+
+    {
+        WAL wal(path, opts);
+
+        // Write 100 entries
+        for (uint64_t i = 1; i <= 100; i++)
+        {
+            std::string test_str = "Entry" + std::to_string(i);
+            wal.Write(i, std::vector<uint8_t>(test_str.begin(), test_str.end()));
+
+            // Print progress every 10 writes
+            if (i % 10 == 0)
+            {
+                std::cout << "Written " << i << " entries, last index: " << wal.LastIndex() << "\n";
+            }
+        }
+
+        assert(wal.FirstIndex() == 1);
+        assert(wal.LastIndex() == 100);
+
+        // Verify some random entries
+        for (int i = 0; i < 5; i++)
+        {
+            uint64_t random_index = 1 + (rand() % 100);
+            std::string expected_str = "Entry" + std::to_string(random_index);
+            auto data = wal.Read(random_index);
+            std::string read_str(data.begin(), data.end());
+            assert(read_str == expected_str);
+            std::cout << "Verified entry " << random_index << ": " << read_str << "\n";
+        }
+
+        // Print detailed segment information
+        // to hit the last segment.
+        auto data = wal.Read(100);
+        std::cout << "\n==== Final Segment Information ====\n";
+        wal.printSegmentInfo();
+    }
+
+    fs::remove_all(path);
+    std::cout << "TestSmallSegmentWithCache passed\n";
+}
+
 int main()
 {
     try
@@ -210,6 +261,7 @@ int main()
         TestTruncations();
         TestJSONFormat();
         TestStringWithJSONFormat();
+        TestSmallSegmentWithCache();
         std::cout << "All tests passed\n";
     }
     catch (const std::exception &e)

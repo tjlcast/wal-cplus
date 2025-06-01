@@ -79,6 +79,7 @@ public:
     void Sync();
     void Close();
     void ClearCache();
+    void printSegmentInfo();
 
 private:
     void Load();
