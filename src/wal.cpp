@@ -594,6 +594,9 @@ std::shared_ptr<WAL::Segment> WAL::LoadSegment(uint64_t index)
     return seg;
 }
 
+/**
+ * "Cycle"（轮转/循环）体现在日志段的分段存储、滚动更新和复用管理机制上。
+ */
 void WAL::CycleSegment()
 {
     if (!sfile_)
