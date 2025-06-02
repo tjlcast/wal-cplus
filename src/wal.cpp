@@ -1189,7 +1189,7 @@ void WAL::printSegmentInfo()
         bool in_cache = false;
         this->scache_.for_each([&seg, &in_cache](int idx, const std::shared_ptr<Segment> &cached_seg)
                                {
-                                (void)idx;
+                                   (void)idx;
                                    if (cached_seg == seg)
                                    {
                                        in_cache = true;
