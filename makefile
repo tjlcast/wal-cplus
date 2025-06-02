@@ -1,10 +1,12 @@
 CXX := g++
-CXXFLAGS := -std=c++17 -Wall -Wextra -Iinclude -O2 -fPIC
+# 修改点1：添加第三方头文件路径
+CXXFLAGS := -std=c++17 -Wall -Wextra -Iinclude -Ithird_party/tinyLRU-cplus -O2 -fPIC
 
 SRC_DIR := src
 TEST_DIR := test
 BUILD_DIR := build
 LIB_DIR := lib
+THIRD_PARTY_DIR := third_party/tinyLRU-cplus
 
 # 安装目录配置
 PREFIX ?= /usr/local
@@ -28,13 +30,16 @@ $(BUILD_DIR):
 $(LIB_DIR):
 	mkdir -p $(LIB_DIR)
 
+# 修改点2：确保第三方目录存在
+$(THIRD_PARTY_DIR):
+	mkdir -p $(THIRD_PARTY_DIR)
+
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/%.o: $(TEST_DIR)/%.cpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-# 静态库规则
 $(LIB_NAME): $(OBJS) | $(LIB_DIR)
 	ar rcs $(LIB_DIR)/$@ $^
 
@@ -47,15 +52,16 @@ clean:
 test: $(TARGET)
 	./$(TARGET)
 
-# 安装目标
 install: $(LIB_NAME)
 	@echo "Installing to $(PREFIX)"
 	install -d $(DESTDIR)$(INCLUDE_DIR)
 	install -d $(DESTDIR)$(LIB_INSTALL_DIR)
 	install -m 644 include/*.h $(DESTDIR)$(INCLUDE_DIR)
 	install -m 644 $(LIB_DIR)/$(LIB_NAME) $(DESTDIR)$(LIB_INSTALL_DIR)
+	# 可选：安装第三方头文件
+	install -d $(DESTDIR)$(INCLUDE_DIR)/third_party
+	install -m 644 $(THIRD_PARTY_DIR)/include/*.hpp $(DESTDIR)$(INCLUDE_DIR)/third_party/
 
-# 卸载目标
 uninstall:
 	@echo "Removing from $(PREFIX)"
 	rm -rf $(DESTDIR)$(INCLUDE_DIR)

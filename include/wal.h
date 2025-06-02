@@ -1,6 +1,8 @@
 #ifndef WAL_H
 #define WAL_H
 
+#include "tinyLRU.hpp"
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -111,10 +113,7 @@ private:
     Batch wbatch_;
 
     // Simple LRU cache implementation
-    std::unordered_map<int, std::shared_ptr<Segment>> scache_;
-    std::vector<int> lru_order_;
-    size_t cache_hits_ = 0;
-    size_t cache_misses_ = 0;
+    tinylru::tinyLRU<int, std::shared_ptr<Segment>> scache_;
 };
 
 #endif // WAL_H

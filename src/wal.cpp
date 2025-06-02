@@ -43,7 +43,9 @@ WAL::WAL(const std::string &path, const Options &options)
 
     fs::create_directories(path_);
 
-    Load();
+    this->scache_.resize(options_.segment_cache_size);
+
+    this->Load();
 }
 
 WAL::~WAL()
@@ -567,13 +569,22 @@ std::shared_ptr<WAL::Segment> WAL::LoadSegment(uint64_t index)
         return last_seg;
     }
 
-    // Check cache
-    for (const auto &[seg_idx, seg] : scache_)
+    // Check the most recent cached segment
+    std::shared_ptr<Segment> found_seg = nullptr;
+    scache_.for_each([index, &found_seg](int seg_idx, const std::shared_ptr<Segment> &seg)
+                     {
+                         (void)seg_idx;
+                         if (seg->index <= index && index < seg->index + seg->epos.size())
+                         {
+                             found_seg = seg; // 通过引用捕获存储结果
+                             return false;    // 终止遍历
+                         }
+                         return true; // 继续遍历
+                     });
+
+    if (found_seg)
     {
-        if (index >= seg->index && index < seg->index + seg->epos.size())
-        {
-            return seg;
-        }
+        return found_seg;
     }
 
     // Find in segments
@@ -943,32 +954,26 @@ void WAL::PushCache(int seg_idx)
         return;
     }
 
-    // Simple LRU cache implementation
-    if (scache_.size() >= options_.segment_cache_size)
-    {
-        // Find least recently used
-        int lru_idx = lru_order_.front();
-        auto it = scache_.find(lru_idx);
-        if (it != scache_.end())
-        {
-            // Clear the evicted segment's data
-            it->second->ebuf.clear();
-            it->second->ebuf.shrink_to_fit();
-            it->second->epos.clear();
-            it->second->epos.shrink_to_fit();
-            scache_.erase(it);
-        }
-        lru_order_.erase(lru_order_.begin());
-    }
+    // 使用 set_evicted 方法更新缓存
+    auto result = scache_.set_evicted(
+        seg_idx,           // key: segment index
+        segments_[seg_idx] // value: segment pointer
+    );
 
-    scache_[seg_idx] = segments_[seg_idx];
-    lru_order_.push_back(seg_idx);
+    // 处理被淘汰的 segment 数据清理
+    if (result.evicted)
+    {
+        // 清理被淘汰 segment 的内存占用
+        result.evicted_value->ebuf.clear();
+        result.evicted_value->ebuf.shrink_to_fit();
+        result.evicted_value->epos.clear();
+        result.evicted_value->epos.shrink_to_fit();
+    }
 }
 
 void WAL::ClearCacheInternal()
 {
-    scache_.clear();
-    lru_order_.clear();
+    scache_.clear(); // 清除所有缓存的 segment
 }
 
 std::string WAL::SegmentName(uint64_t index)
@@ -1182,23 +1187,26 @@ void WAL::printSegmentInfo()
 
         // Print cache status
         bool in_cache = false;
-        for (const auto &[idx, cached_seg] : scache_)
-        {
-            if (cached_seg == seg)
-            {
-                in_cache = true;
-                break;
-            }
-        }
+        this->scache_.for_each([&seg, &in_cache](int idx, const std::shared_ptr<Segment> &cached_seg)
+                               {
+                                (void)idx;
+                                   if (cached_seg == seg)
+                                   {
+                                       in_cache = true;
+                                       return false; // 终止遍历
+                                   }
+                                   return true; // 继续遍历
+                               });
         std::cout << "  In Cache: " << (in_cache ? "Yes" : "No") << std::endl;
     }
 
     std::cout << "\n===== Cache Information =====" << std::endl;
     std::cout << "Cached Segments (LRU order): ";
-    for (int idx : lru_order_)
-    {
-        std::cout << idx << " ";
-    }
+    scache_.for_each([&](int seg_idx, const std::shared_ptr<Segment> & /*seg*/)
+                     {
+                         std::cout << seg_idx << " ";
+                         return true; // 继续遍历所有项
+                     });
     std::cout << std::endl;
 
     std::cout << "\n===== Options =====" << std::endl;
