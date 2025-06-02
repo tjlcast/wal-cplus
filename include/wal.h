@@ -48,7 +48,7 @@ public:
         std::vector<std::pair<size_t, size_t>> epos; // start and end positions
     };
 
-        struct Options
+    struct Options
     {
         bool no_sync = false;
         size_t segment_size = 20971520; // 20MB
@@ -106,7 +106,7 @@ private:
     Options options_;
     bool closed_ = false;
     bool corrupt_ = false;
-    
+
     uint64_t first_index_ = 0;
     uint64_t last_index_ = 0;
     std::unique_ptr<std::fstream> sfile_;
