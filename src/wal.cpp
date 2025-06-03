@@ -920,19 +920,19 @@ void WAL::pushCache(int seg_idx)
     }
 
     // 使用 set_evicted 方法更新缓存
-    auto result = scache_.set_evicted(
+    auto [prev, replaced, evicted_key, evicted_value, evicted] = scache_.set_evicted(
         seg_idx,           // key: segment index
         segments_[seg_idx] // value: segment pointer
     );
 
     // 处理被淘汰的 segment 数据清理
-    if (result.evicted)
+    if (evicted)
     {
         // 清理被淘汰 segment 的内存占用
-        result.evicted_value->ebuf.clear();
-        result.evicted_value->ebuf.shrink_to_fit();
-        result.evicted_value->epos.clear();
-        result.evicted_value->epos.shrink_to_fit();
+        evicted_value->ebuf.clear();
+        evicted_value->ebuf.shrink_to_fit();
+        evicted_value->epos.clear();
+        evicted_value->epos.shrink_to_fit();
     }
 }
 

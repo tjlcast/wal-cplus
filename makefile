@@ -1,6 +1,6 @@
 CXX := g++
 # 修改点1：添加第三方头文件路径
-CXXFLAGS := -std=c++17 -Wall -Wextra -Iinclude -Ithird_party/tinyLRU-cplus -O2 -fPIC
+CXXFLAGS := -std=c++17 -fsanitize=address -Wall -Wextra -Iinclude -Ithird_party/tinyLRU-cplus -O2 -fPIC
 
 SRC_DIR := src
 TEST_DIR := test
