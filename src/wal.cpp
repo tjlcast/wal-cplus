@@ -55,7 +55,7 @@ WAL::~WAL()
 
 void WAL::Write(uint64_t index, const std::vector<uint8_t> &data)
 {
-    // std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(mutex_);
     if (corrupt_)
     {
         throw std::runtime_error("log corrupt");
@@ -68,7 +68,7 @@ void WAL::Write(uint64_t index, const std::vector<uint8_t> &data)
     wbatch_.Clear();
     wbatch_.Write(index, data);
 
-    WriteBatch(&wbatch_);
+    WriteBatchInternal(&wbatch_);
 }
 
 std::vector<uint8_t> WAL::Read(uint64_t index)
@@ -219,7 +219,7 @@ void WAL::TruncateBack(uint64_t index)
 
 void WAL::Sync()
 {
-    // std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(mutex_);
     if (corrupt_)
     {
         throw std::runtime_error("log corrupt");
@@ -263,7 +263,8 @@ void WAL::Close()
     if (sfile_)
     {
 
-        Sync();
+        // Sync();
+        sfile_->flush();
         sfile_->close();
     }
     closed_ = true;
@@ -616,10 +617,10 @@ void WAL::CycleSegment()
     }
 
     sfile_->flush();
-    if (!options_.no_sync)
-    {
-        Sync();
-    }
+    // if (!options_.no_sync)
+    // {
+    //     Sync();
+    // }
     sfile_->close();
 
     // Cache the previous segment
@@ -641,6 +642,20 @@ void WAL::CycleSegment()
 }
 
 void WAL::WriteBatch(Batch *batch)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (corrupt_)
+    {
+        throw std::runtime_error("log corrupt");
+    }
+    if (closed_)
+    {
+        throw std::runtime_error("log closed");
+    }
+    return WriteBatchInternal(batch);
+}
+
+void WAL::WriteBatchInternal(Batch *batch)
 {
     if (batch->entries.empty())
     {
@@ -710,7 +725,8 @@ void WAL::WriteBatch(Batch *batch)
 
     if (!options_.no_sync)
     {
-        Sync();
+        // Sync();
+        sfile_->flush();
     }
 
     batch->Clear();

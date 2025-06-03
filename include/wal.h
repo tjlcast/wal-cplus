@@ -89,6 +89,7 @@ private:
     int FindSegment(uint64_t index) const;
     std::shared_ptr<Segment> LoadSegment(uint64_t index);
     void CycleSegment();
+    void WriteBatchInternal(Batch *batch);
     void TruncateFrontInternal(uint64_t index);
     void TruncateBackInternal(uint64_t index);
     void PushCache(int seg_idx);
