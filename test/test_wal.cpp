@@ -245,7 +245,7 @@ void TestSmallSegmentWithCache()
         // to hit the last segment.
         auto data = wal.Read(100);
         std::cout << "\n==== Final Segment Information ====\n";
-        wal.printSegmentInfo();
+        wal.PrintSegmentInfo();
     }
 
     fs::remove_all(path);

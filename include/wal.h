@@ -81,26 +81,27 @@ public:
     void Sync();
     void Close();
     void ClearCache();
-    void printSegmentInfo();
+    void PrintSegmentInfo();
 
 private:
-    void Load();
-    void LoadSegmentEntries(std::shared_ptr<Segment> segment);
-    int FindSegment(uint64_t index) const;
-    std::shared_ptr<Segment> LoadSegment(uint64_t index);
-    void CycleSegment();
-    void WriteBatchInternal(Batch *batch);
-    void TruncateFrontInternal(uint64_t index);
-    void TruncateBackInternal(uint64_t index);
-    void PushCache(int seg_idx);
-    void ClearCacheInternal();
+    void load();
+    void loadSegmentEntries(std::shared_ptr<Segment> segment);
+    int findSegment(uint64_t index) const;
+    std::shared_ptr<Segment> loadSegment(uint64_t index);
+    void cycleSegment
+    ();
+    void writeBatchInternal(Batch *batch);
+    void truncateFrontInternal(uint64_t index);
+    void truncateBackInternal(uint64_t index);
+    void pushCache(int seg_idx);
+    void clearCacheInternal();
 
-    static std::string SegmentName(uint64_t index);
+    static std::string segmentName(uint64_t index);
     static std::pair<std::vector<uint8_t>, std::pair<size_t, size_t>>
-    AppendEntry(const std::vector<uint8_t> &dst, uint64_t index,
+    appendEntry(const std::vector<uint8_t> &dst, uint64_t index,
                 const std::vector<uint8_t> &data, LogFormat format);
-    static std::vector<uint8_t> ReadJSON(const std::vector<uint8_t> &edata);
-    static std::vector<uint8_t> ReadBinary(const std::vector<uint8_t> &edata, bool no_copy);
+    static std::vector<uint8_t> readJSON(const std::vector<uint8_t> &edata);
+    static std::vector<uint8_t> readBinary(const std::vector<uint8_t> &edata, bool no_copy);
 
     mutable std::mutex mutex_;
     std::string path_;

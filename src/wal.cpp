@@ -45,7 +45,7 @@ WAL::WAL(const std::string &path, const Options &options)
 
     this->scache_.resize(options_.segment_cache_size);
 
-    this->Load();
+    this->load();
 }
 
 WAL::~WAL()
@@ -68,7 +68,7 @@ void WAL::Write(uint64_t index, const std::vector<uint8_t> &data)
     wbatch_.Clear();
     wbatch_.Write(index, data);
 
-    WriteBatchInternal(&wbatch_);
+    writeBatchInternal(&wbatch_);
 }
 
 std::vector<uint8_t> WAL::Read(uint64_t index)
@@ -87,7 +87,7 @@ std::vector<uint8_t> WAL::Read(uint64_t index)
         throw std::runtime_error("not found");
     }
 
-    auto s = LoadSegment(index);
+    auto s = loadSegment(index);
     const auto &epos = s->epos[index - s->index];
     const auto edata = std::vector<uint8_t>(
         s->ebuf.begin() + epos.first,
@@ -95,9 +95,9 @@ std::vector<uint8_t> WAL::Read(uint64_t index)
 
     if (options_.log_format == LogFormat::JSON)
     {
-        return ReadJSON(edata);
+        return readJSON(edata);
     }
-    return ReadBinary(edata, options_.no_copy);
+    return readBinary(edata, options_.no_copy);
 }
 
 uint64_t WAL::FirstIndex()
@@ -147,7 +147,7 @@ void WAL::TruncateFront(uint64_t index)
     {
         throw std::runtime_error("log closed");
     }
-    TruncateFrontInternal(index);
+    truncateFrontInternal(index);
     std::cout << "segments size after truncate: " << segments_.size() << std::endl;
 }
 
@@ -162,60 +162,9 @@ void WAL::TruncateBack(uint64_t index)
     {
         throw std::runtime_error("log closed");
     }
-    TruncateBackInternal(index);
+    truncateBackInternal(index);
     std::cout << "segments size after truncate: " << segments_.size() << std::endl;
 }
-
-// void WAL::Sync() {
-//     std::lock_guard<std::mutex> lock(mutex_);
-//     if (corrupt_) {
-//         throw std::runtime_error("log corrupt");
-//     }
-//     if (closed_) {
-//         throw std::runtime_error("log closed");
-//     }
-//     if (sfile_) {
-//         sfile_->flush();
-//         if (!options_.no_sync) {
-//             // On Windows, we need to handle this differently
-//             #ifdef _WIN32
-//             HANDLE hFile = (HANDLE)_get_osfhandle(sfile_->native_handle());
-//             FlushFileBuffers(hFile);
-//             #else
-//             fsync(sfile_->native_handle());
-//             #endif
-//         }
-//     }
-// }
-
-// src/wal.cpp
-// void WAL::Sync()
-// {
-//     std::lock_guard<std::mutex> lock(mutex_);
-//     if (corrupt_)
-//     {
-//         throw std::runtime_error("log corrupt");
-//     }
-//     if (closed_)
-//     {
-//         throw std::runtime_error("log closed");
-//     }
-//     if (sfile_)
-//     {
-//         sfile_->flush();
-//         if (!options_.no_sync)
-//         {
-//             // 更简单的跨平台同步方式
-//             std::ofstream ofs;
-//             ofs.open(sfile_->path(), std::ios::out | std::ios::binary);
-//             if (ofs)
-//             {
-//                 ofs.flush();
-//                 ofs.close();
-//             }
-//         }
-//     }
-// }
 
 void WAL::Sync()
 {
@@ -285,11 +234,11 @@ void WAL::ClearCache()
     {
         throw std::runtime_error("log closed");
     }
-    ClearCacheInternal();
+    clearCacheInternal();
 }
 
 // Private methods
-void WAL::Load()
+void WAL::load()
 {
     // 直接使用成员变量 segments_ 替代局部变量 segments
     segments_.clear();
@@ -352,7 +301,7 @@ void WAL::Load()
     {
         auto seg = std::make_shared<Segment>();
         seg->index = 1;
-        seg->path = (fs::path(path_) / SegmentName(1)).string();
+        seg->path = (fs::path(path_) / segmentName(1)).string();
         segments_.push_back(seg);
         first_index_ = 1;
         last_index_ = 0;
@@ -442,11 +391,11 @@ void WAL::Load()
     }
 
     sfile_->seekp(0, std::ios::end);
-    LoadSegmentEntries(last_seg);
+    loadSegmentEntries(last_seg);
     last_index_ = last_seg->index + last_seg->epos.size() - 1;
 }
 
-void WAL::LoadSegmentEntries(std::shared_ptr<Segment> segment)
+void WAL::loadSegmentEntries(std::shared_ptr<Segment> segment)
 {
     std::ifstream file(segment->path, std::ios::binary | std::ios::ate);
     if (!file)
@@ -514,7 +463,7 @@ void WAL::LoadSegmentEntries(std::shared_ptr<Segment> segment)
     std::cout << "]" << std::endl;
 }
 
-// int WAL::FindSegment(uint64_t index) const
+// int WAL::findSegment(uint64_t index) const
 // {
 //     int low = 0;
 //     int high = segments_.size() - 1;
@@ -538,7 +487,7 @@ void WAL::LoadSegmentEntries(std::shared_ptr<Segment> segment)
 //     return result;
 // }
 
-int WAL::FindSegment(uint64_t index) const
+int WAL::findSegment(uint64_t index) const
 {
     int low = 0;
     int high = segments_.size();
@@ -561,7 +510,7 @@ int WAL::FindSegment(uint64_t index) const
     return low - 1; // 返回最后一个满足条件的索引
 }
 
-std::shared_ptr<WAL::Segment> WAL::LoadSegment(uint64_t index)
+std::shared_ptr<WAL::Segment> WAL::loadSegment(uint64_t index)
 {
     // Check last segment first
     auto last_seg = segments_.back();
@@ -589,7 +538,7 @@ std::shared_ptr<WAL::Segment> WAL::LoadSegment(uint64_t index)
     }
 
     // Find in segments
-    int seg_idx = FindSegment(index);
+    int seg_idx = findSegment(index);
     if (seg_idx == -1)
     {
         throw std::runtime_error("segment not found");
@@ -598,18 +547,18 @@ std::shared_ptr<WAL::Segment> WAL::LoadSegment(uint64_t index)
     auto seg = segments_[seg_idx];
     if (seg->epos.empty())
     {
-        LoadSegmentEntries(seg);
+        loadSegmentEntries(seg);
     }
 
     // Update cache
-    PushCache(seg_idx);
+    pushCache(seg_idx);
     return seg;
 }
 
 /**
  * "Cycle"（轮转/循环）体现在日志段的分段存储、滚动更新和复用管理机制上。
  */
-void WAL::CycleSegment()
+void WAL::cycleSegment()
 {
     if (!sfile_)
     {
@@ -624,11 +573,11 @@ void WAL::CycleSegment()
     sfile_->close();
 
     // Cache the previous segment
-    PushCache(segments_.size() - 1);
+    pushCache(segments_.size() - 1);
 
     auto new_seg = std::make_shared<Segment>();
     new_seg->index = last_index_ + 1;
-    new_seg->path = (fs::path(path_) / SegmentName(new_seg->index)).string();
+    new_seg->path = (fs::path(path_) / segmentName(new_seg->index)).string();
 
     sfile_ = std::make_unique<std::fstream>(
         new_seg->path,
@@ -652,10 +601,10 @@ void WAL::WriteBatch(Batch *batch)
     {
         throw std::runtime_error("log closed");
     }
-    return WriteBatchInternal(batch);
+    return writeBatchInternal(batch);
 }
 
-void WAL::WriteBatchInternal(Batch *batch)
+void WAL::writeBatchInternal(Batch *batch)
 {
     if (batch->entries.empty())
     {
@@ -674,7 +623,7 @@ void WAL::WriteBatchInternal(Batch *batch)
 
     if (seg->ebuf.size() > options_.segment_size)
     {
-        CycleSegment();
+        cycleSegment();
         seg = segments_.back();
     }
 
@@ -688,7 +637,7 @@ void WAL::WriteBatchInternal(Batch *batch)
             batch->datas.begin() + data_pos,
             batch->datas.begin() + data_pos + entry.size);
 
-        auto [new_ebuf, epos] = AppendEntry(
+        auto [new_ebuf, epos] = appendEntry(
             seg->ebuf, entry.index, data, options_.log_format);
         seg->ebuf = new_ebuf;
         seg->epos.push_back(epos);
@@ -704,7 +653,7 @@ void WAL::WriteBatchInternal(Batch *batch)
             }
 
             last_index_ = entry.index;
-            CycleSegment();
+            cycleSegment();
             seg = segments_.back();
             mark = 0;
         }
@@ -732,7 +681,7 @@ void WAL::WriteBatchInternal(Batch *batch)
     batch->Clear();
 }
 
-void WAL::TruncateFrontInternal(uint64_t index)
+void WAL::truncateFrontInternal(uint64_t index)
 {
     if (index == 0 || last_index_ == 0 || index < first_index_ || index > last_index_)
     {
@@ -743,8 +692,8 @@ void WAL::TruncateFrontInternal(uint64_t index)
         return;
     }
 
-    int seg_idx = FindSegment(index);
-    auto seg = LoadSegment(index);
+    int seg_idx = findSegment(index);
+    auto seg = loadSegment(index);
     auto epos = std::vector<std::pair<size_t, size_t>>(
         seg->epos.begin() + (index - seg->index),
         seg->epos.end());
@@ -766,7 +715,7 @@ void WAL::TruncateFrontInternal(uint64_t index)
     }
 
     // Rename to START file
-    fs::path start_path = fs::path(path_) / (SegmentName(index) + ".START");
+    fs::path start_path = fs::path(path_) / (segmentName(index) + ".START");
     fs::rename(temp_path, start_path);
 
     try
@@ -784,7 +733,7 @@ void WAL::TruncateFrontInternal(uint64_t index)
         }
 
         // Rename START to final name
-        fs::path new_path = fs::path(path_) / SegmentName(index);
+        fs::path new_path = fs::path(path_) / segmentName(index);
         fs::rename(start_path, new_path);
 
         seg->path = new_path.string();
@@ -807,7 +756,7 @@ void WAL::TruncateFrontInternal(uint64_t index)
                 throw std::runtime_error("invalid seek");
             }
 
-            LoadSegmentEntries(seg);
+            loadSegmentEntries(seg);
         }
 
         std::cout << "Before truncation, segments size: " << segments_.size() << std::endl;
@@ -837,7 +786,7 @@ void WAL::TruncateFrontInternal(uint64_t index)
 
         // 更新 first_index_
         first_index_ = index;
-        ClearCacheInternal();
+        clearCacheInternal();
     }
     catch (...)
     {
@@ -846,7 +795,7 @@ void WAL::TruncateFrontInternal(uint64_t index)
     }
 }
 
-void WAL::TruncateBackInternal(uint64_t index)
+void WAL::truncateBackInternal(uint64_t index)
 {
     std::cout << "Truncating back to index: " << index << std::endl;
     if (index == 0 || last_index_ == 0 || index < first_index_ || index > last_index_)
@@ -858,9 +807,9 @@ void WAL::TruncateBackInternal(uint64_t index)
         return;
     }
 
-    int seg_idx = FindSegment(index);
+    int seg_idx = findSegment(index);
     std::cout << "Segment index found: " << seg_idx << std::endl;
-    auto seg = LoadSegment(index);
+    auto seg = loadSegment(index);
     std::cout << "Loaded segment: " << seg->path << std::endl;
     auto epos = std::vector<std::pair<size_t, size_t>>(
         seg->epos.begin(),
@@ -896,7 +845,7 @@ void WAL::TruncateBackInternal(uint64_t index)
     }
 
     // Rename to END file
-    fs::path end_path = fs::path(path_) / (SegmentName(seg->index) + ".END");
+    fs::path end_path = fs::path(path_) / (segmentName(seg->index) + ".END");
     fs::rename(temp_path, end_path);
 
     try
@@ -911,7 +860,7 @@ void WAL::TruncateBackInternal(uint64_t index)
         }
 
         // Rename END to final name
-        fs::path new_path = fs::path(path_) / SegmentName(seg->index);
+        fs::path new_path = fs::path(path_) / segmentName(seg->index);
         fs::rename(end_path, new_path);
 
         // Reopen tail segment
@@ -953,8 +902,8 @@ void WAL::TruncateBackInternal(uint64_t index)
         // }
 
         last_index_ = index;
-        ClearCacheInternal();
-        LoadSegmentEntries(seg);
+        clearCacheInternal();
+        loadSegmentEntries(seg);
     }
     catch (...)
     {
@@ -963,7 +912,7 @@ void WAL::TruncateBackInternal(uint64_t index)
     }
 }
 
-void WAL::PushCache(int seg_idx)
+void WAL::pushCache(int seg_idx)
 {
     if (seg_idx < 0 || seg_idx >= static_cast<int>(segments_.size()))
     {
@@ -987,12 +936,12 @@ void WAL::PushCache(int seg_idx)
     }
 }
 
-void WAL::ClearCacheInternal()
+void WAL::clearCacheInternal()
 {
     scache_.clear(); // 清除所有缓存的 segment
 }
 
-std::string WAL::SegmentName(uint64_t index)
+std::string WAL::segmentName(uint64_t index)
 {
     std::ostringstream oss;
     oss << std::setw(20) << std::setfill('0') << index;
@@ -1000,7 +949,7 @@ std::string WAL::SegmentName(uint64_t index)
 }
 
 std::pair<std::vector<uint8_t>, std::pair<size_t, size_t>>
-WAL::AppendEntry(const std::vector<uint8_t> &dst, uint64_t index,
+WAL::appendEntry(const std::vector<uint8_t> &dst, uint64_t index,
                  const std::vector<uint8_t> &data, LogFormat format)
 {
     std::vector<uint8_t> out = dst;
@@ -1085,7 +1034,7 @@ WAL::AppendEntry(const std::vector<uint8_t> &dst, uint64_t index,
     return {out, {pos, out.size()}};
 }
 
-std::vector<uint8_t> WAL::ReadJSON(const std::vector<uint8_t> &edata)
+std::vector<uint8_t> WAL::readJSON(const std::vector<uint8_t> &edata)
 {
     try
     {
@@ -1130,7 +1079,7 @@ std::vector<uint8_t> WAL::ReadJSON(const std::vector<uint8_t> &edata)
     }
 }
 
-std::vector<uint8_t> WAL::ReadBinary(const std::vector<uint8_t> &edata, bool no_copy)
+std::vector<uint8_t> WAL::readBinary(const std::vector<uint8_t> &edata, bool no_copy)
 {
     uint64_t size;
     size_t n = ReadVarint(edata.data(), edata.size(), &size);
@@ -1168,9 +1117,9 @@ void WAL::Batch::Clear()
     datas.clear();
 }
 
-void WAL::printSegmentInfo()
+void WAL::PrintSegmentInfo()
 {
-    // std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(mutex_);
 
     std::cout << "===== WAL Segment Information =====" << std::endl;
     std::cout << "Path: " << path_ << std::endl;
